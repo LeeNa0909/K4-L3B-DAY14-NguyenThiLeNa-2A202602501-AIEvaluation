@@ -244,25 +244,43 @@ class TextGenerator(Protocol):
 
 class OpenAIGenerator:
     def __init__(self, max_output_tokens: int = 300) -> None:
-        api_key = os.getenv("OPENAI_API_KEY", "").strip()
-        self.model = os.getenv("OPENAI_MODEL", "").strip()
+        api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+        self.model = os.getenv("OPENROUTER_MODEL", "").strip()
+        base_url = os.getenv(
+            "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
+        ).strip()
         if not api_key:
-            raise RuntimeError("OPENAI_API_KEY is missing from .env")
+            raise RuntimeError("OPENROUTER_API_KEY is missing from .env")
         if not self.model:
-            raise RuntimeError("OPENAI_MODEL is missing from .env")
-        self.client = OpenAI(api_key=api_key)
+            raise RuntimeError("OPENROUTER_MODEL is missing from .env")
+
+        client_kwargs: dict[str, Any] = {
+            "api_key": api_key,
+            "base_url": base_url,
+        }
+        default_headers: dict[str, str] = {}
+        http_referer = os.getenv("OPENROUTER_HTTP_REFERER", "").strip()
+        app_title = os.getenv("OPENROUTER_APP_TITLE", "").strip()
+        if http_referer:
+            default_headers["HTTP-Referer"] = http_referer
+        if app_title:
+            default_headers["X-OpenRouter-Title"] = app_title
+        if default_headers:
+            client_kwargs["default_headers"] = default_headers
+
+        self.client = OpenAI(**client_kwargs)
         self.max_output_tokens = max_output_tokens
 
     def generate(self, prompt: str) -> str:
-        response = self.client.responses.create(
+        response = self.client.chat.completions.create(
             model=self.model,
-            input=prompt,
+            messages=[{"role": "user", "content": prompt}],
             temperature=0,
-            max_output_tokens=self.max_output_tokens,
+            max_tokens=self.max_output_tokens,
         )
-        answer = response.output_text.strip()
+        answer = (response.choices[0].message.content or "").strip()
         if not answer:
-            raise RuntimeError("OpenAI returned an empty answer")
+            raise RuntimeError("OpenRouter returned an empty answer")
         return answer
 
 
