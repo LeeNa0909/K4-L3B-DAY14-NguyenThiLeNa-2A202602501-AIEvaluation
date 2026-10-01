@@ -282,19 +282,21 @@ verbosity bias và self-preference bằng cách nào?
 Chỉ làm sau khi hoàn thành 3.1–3.3. Chọn hai framework trong RAGAS, DeepEval
 và TruLens; chạy hoặc thiết kế một so sánh có cùng input dataset.
 
-| Tiêu chí | Framework 1: ____ | Framework 2: ____ |
+| Tiêu chí | Framework 1: RAGAS | Framework 2: DeepEval |
 |---|---|---|
-| Setup complexity | | |
-| Metrics available | | |
-| CI/CD integration | | |
-| Kết quả trên cùng dataset | | |
-| Insight rút ra | | |
+| Độ phức tạp khi setup | Cần cài package, tạo dataset/test case và cấu hình metric; phù hợp khi muốn đánh giá RAG theo pipeline. | Cần tạo test case và metric object; cách khai báo khá trực tiếp, phù hợp để đưa vào test hoặc CI. |
+| Các metrics có sẵn | Faithfulness, answer relevancy, context recall và context precision; có thể mở rộng thêm metric tự định nghĩa. | Faithfulness, answer relevancy, contextual precision/recall và các metric LLM-based khác. |
+| Tích hợp CI/CD | Có thể chạy evaluator trong script rồi chặn release theo threshold; cần tự nối với quality gate. | Có cấu trúc gần với unit test nên dễ chạy trong CI và báo fail theo từng test case. |
+| Kết quả trên cùng dataset | Dùng cùng 20 QA, actual answers và retrieved contexts; dự kiến bắt được các case thấp như M05, H01 và A03, nhưng điểm không nhất thiết bằng word overlap trong core. | Dùng đúng cùng input; có thể giải thích ngữ nghĩa tốt hơn ở các case refusal/false premise, nhưng cần kiểm soát chi phí và độ ổn định của judge. |
+| Insight rút ra | Mạnh ở việc theo dõi cả answer-side và retrieval-side trong một pipeline RAG. | Mạnh ở việc viết assertion theo từng test case và mở rộng đánh giá theo rubric/domain. |
 
 - Scores có nhất quán không?
 - Framework nào strict hơn và vì sao?
 - Hai framework có tìm ra cùng failure cases không?
 
 > *Phân tích:*
+
+> Mình chọn RAGAS và DeepEval vì cả hai đều phù hợp với bài toán RAG nhưng cách tích hợp khác nhau. Phương pháp so sánh là giữ nguyên 20 câu hỏi, expected answers, actual answers và retrieved contexts; chỉ thay evaluator, không sinh lại answer. Mình sẽ so sánh điểm trung bình, các case thấp nhất và thời gian/chi phí chạy. Hai framework có thể không cho cùng một điểm vì cách chấm entailment và prompt judge khác nhau. Mình dự đoán RAGAS thuận tiện hơn khi phân tích riêng retrieval, còn DeepEval thuận tiện hơn khi biến từng tiêu chí thành một test trong CI. Các case A01–A03 cần review thủ công vì lời từ chối an toàn có thể bị chấm thấp nếu judge không hiểu scope.
 
 ### Bài 3.5 — Reranking kết quả truy hồi (Bonus +5)
 
@@ -307,22 +309,26 @@ thay đổi Context Recall hay không.
 4. Rerank cùng tập chunks, không thêm hoặc xóa chunk.
 5. Tính lại hai metrics và giải thích kết quả.
 
-| ID | Recall before | Recall after | Precision before | Precision after | Delta Precision |
+| ID | Recall trước | Recall sau | Precision trước | Precision sau | Delta Precision |
 |---|---:|---:|---:|---:|---:|
-| | | | | | |
-| | | | | | |
-| | | | | | |
-| | | | | | |
-| | | | | | |
-| **Avg** | | | | | |
+| A03 | 0.909 | 0.909 | 0.887 | 0.804 | -0.083 |
+| H01 | 0.714 | 0.714 | 0.700 | 0.867 | +0.167 |
+| M05 | 0.541 | 0.541 | 0.950 | 1.000 | +0.050 |
+| E01 | 0.968 | 0.968 | 0.700 | 0.750 | +0.050 |
+| H03 | 0.763 | 0.763 | 1.000 | 1.000 | +0.000 |
+| **Trung bình** | 0.779 | 0.779 | 0.847 | 0.884 | +0.037 |
 
 **Tại sao Recall dự kiến không đổi?**
 
 > *Câu trả lời:*
 
+> Recall không đổi vì reranking chỉ sắp xếp lại các chunk hiện có, không thêm hoặc xóa chunk. Hợp các tập từ của chunks trước và sau là như nhau nên độ bao phủ expected answer vẫn giữ nguyên. Kết quả thực tế của 5 case là 0.779 trước và sau rerank.
+
 **Khi nào reranking không đủ và cần sửa retriever/query/chunking?**
 
 > *Câu trả lời:*
+
+> Reranking không đủ khi retriever chưa lấy được evidence cần thiết, query không thể hiện đủ các intent, chunk bị cắt sai hoặc policy nằm ở nhiều tài liệu khác nhau. Kết quả A03 cũng cho thấy overlap với câu hỏi có thể xếp nhầm chunk nhiễu lên trước và làm Precision giảm 0.083. Vì vậy cần sửa query decomposition, BM25/top-k, chunking hoặc dùng reranker ngữ nghĩa nếu lỗi còn lặp lại; không nên chỉ tăng trọng số overlap.
 
 ---
 
